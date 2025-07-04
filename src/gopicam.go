@@ -9,6 +9,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"os/exec"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -101,7 +102,7 @@ func startFFMPEGRecording() error {
 		if err != nil {
 			log.Fatal(err)
 		}
-		serverState.recordingStartTime = int(time.Now().Unix())
+		serverState.recordingStartTime = int(time.Now().UnixMilli())
 		serverState.ffmpegPid = serverState.ffmpegCmd.Process.Pid
 		serverState.recordingState = true
 
@@ -194,7 +195,11 @@ func recordHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	fmt.Fprintf(w, `{"status": "success", "action": "%s"}`, action)
+	if action == "stop" {
+		fmt.Fprintf(w, "Not Recording..")
+	} else {
+		fmt.Fprintf(w, "Recording...")
+	}
 }
 
 func statisticsHandler(w http.ResponseWriter, r *http.Request) {
@@ -226,4 +231,32 @@ func statisticsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Println("Sent Statistics to client")
+}
+
+func deleteHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	err := r.ParseForm()
+	if err != nil {
+		http.Error(w, "Error parsing form", http.StatusBadRequest)
+		return
+	}
+
+	days, err := strconv.ParseInt(r.FormValue("days"), 10, 64)
+	if err != nil {
+		http.Error(w, "Error parsing days", http.StatusBadRequest)
+		return
+	}
+	deletedFiles := deleteFilesOlderThan(config.recording_clips_dir, int(days))
+
+	w.Header().Set("Content-Type", "text")
+
+	if deletedFiles == 0 {
+		fmt.Fprintf(w, "0 Files Deleted")
+	} else {
+		fmt.Fprintf(w, "%d Files Deleted", deletedFiles)
+	}
 }
