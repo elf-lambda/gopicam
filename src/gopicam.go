@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/md5"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -33,7 +34,10 @@ type ServerState struct {
 	ffmpegCmd          *exec.Cmd
 }
 
-var serverState = &ServerState{serverStartTime: int(time.Now().UnixMilli()), recordingStartTime: -1}
+var serverState = &ServerState{
+	serverStartTime:    int(time.Now().UnixMilli()),
+	recordingStartTime: -1,
+}
 
 // -------------------------------------------------------------------------------------
 
@@ -51,7 +55,6 @@ func readFrames(reader io.Reader) {
 			continue
 		}
 
-		// Store the frame
 		frameMutex.Lock()
 		latestFrame = frameData
 		frameMutex.Unlock()
@@ -149,7 +152,13 @@ func formatSize(bytes uint64) string {
 func streamHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "multipart/x-mixed-replace; boundary=frame")
 
-	flusher := w.(http.Flusher)
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "Streaming not supported", http.StatusInternalServerError)
+		return
+	}
+
+	var lastHash [16]byte
 
 	for {
 		frameMutex.RLock()
@@ -158,15 +167,31 @@ func streamHandler(w http.ResponseWriter, r *http.Request) {
 		frameMutex.RUnlock()
 
 		if len(frame) == 0 {
+			time.Sleep(10 * time.Millisecond)
 			continue
 		}
 
-		fmt.Fprintf(w, "--frame\r\nContent-Type: image/jpeg\r\nContent-Length: %d\r\n\r\n", len(frame))
-		w.Write(frame)
-		fmt.Fprintf(w, "\r\n")
-		flusher.Flush()
+		currentHash := md5.Sum(frame)
+		if currentHash == lastHash {
+			time.Sleep(5 * time.Millisecond)
+			continue
+		}
+		lastHash = currentHash
 
-		time.Sleep(33 * time.Millisecond) // 30fps
+		_, err := fmt.Fprintf(w, "--frame\r\nContent-Type: image/jpeg\r\nContent-Length: %d\r\n\r\n", len(frame))
+		if err != nil {
+			log.Println("Client disconnected:", err)
+			return
+		}
+
+		_, err = w.Write(frame)
+		if err != nil {
+			log.Println("Write error:", err)
+			return
+		}
+
+		fmt.Fprint(w, "\r\n")
+		flusher.Flush()
 	}
 }
 
@@ -213,7 +238,7 @@ func statisticsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// TODO: change this on deployment
-	diskStats := getDiskSpaceInfo("/")
+	diskStats := getDiskSpaceInfo(config.statisticsDir)
 
 	diskInfo := map[string]interface{}{
 		"totalSpace":               diskStats[0],
