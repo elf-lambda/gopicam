@@ -4,11 +4,18 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+
+	_ "net/http/pprof"
 )
 
 // -------------------------------------------------------------------------------------
 
 func main() {
+	// DEBUG
+	// go func() {
+	// 	log.Println(http.ListenAndServe("localhost:6060", nil))
+	// }()
+
 	// Port 8080 for live
 	go connectToSource("http://localhost:8080")
 	fmt.Println("Loaded config: ", config)

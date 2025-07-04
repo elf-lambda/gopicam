@@ -1,7 +1,7 @@
 package main
 
 import (
-	"crypto/md5"
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,6 +16,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/zeebo/xxh3"
 )
 
 var (
@@ -56,7 +58,9 @@ func readFrames(reader io.Reader) {
 		}
 
 		frameMutex.Lock()
-		latestFrame = frameData
+		if !bytes.Equal(frameData, latestFrame) {
+			latestFrame = frameData
+		}
 		frameMutex.Unlock()
 	}
 }
@@ -86,7 +90,7 @@ func getFFMPEGCommand(config *Config) []string {
 		"-video_size", "1280x720",
 		"-i", config.camera_url,
 		"-c:v", "h264_v4l2m2m",
-		"-crf", "0",
+		// "-crf", "0",
 		"-pix_fmt", "yuv420p",
 		"-b:v", "1M",
 		"-f", "segment",
@@ -158,7 +162,7 @@ func streamHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var lastHash [16]byte
+	var lastHash uint64
 
 	for {
 		frameMutex.RLock()
@@ -171,7 +175,7 @@ func streamHandler(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		currentHash := md5.Sum(frame)
+		currentHash := xxh3.Hash(frame)
 		if currentHash == lastHash {
 			time.Sleep(5 * time.Millisecond)
 			continue
@@ -324,7 +328,8 @@ func videosHandler(w http.ResponseWriter, r *http.Request) {
 	var videoCount int
 	html.WriteString("<ul>")
 	for _, entry := range files {
-		if entry.Type().IsRegular() && strings.HasSuffix(strings.ToLower(entry.Name()), ".mkv") {
+		if entry.Type().IsRegular() && (strings.HasSuffix(strings.ToLower(entry.Name()), ".mkv") ||
+			strings.HasSuffix(strings.ToLower(entry.Name()), ".avi")) {
 			videoCount++
 			encoded := url.PathEscape(entry.Name())
 			html.WriteString(fmt.Sprintf(
