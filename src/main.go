@@ -9,7 +9,7 @@ import (
 // -------------------------------------------------------------------------------------
 
 func main() {
-	go connectToSource("http://localhost:8002")
+	go connectToSource("http://localhost:8080")
 	fmt.Println("Loaded config: ", config)
 
 	fs := http.FileServer(http.Dir("static"))

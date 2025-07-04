@@ -125,6 +125,7 @@ func stopFFMPEGRecording() {
 		serverState.recordingStartTime = -1
 		serverState.ffmpegCmd = nil
 		serverState.ffmpegPid = -1
+		return
 	}
 	fmt.Println("Recording not started. Doing nothing.")
 }
@@ -212,7 +213,7 @@ func statisticsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// TODO: change this on deployment
-	diskStats := getDiskSpaceInfo("D:/")
+	diskStats := getDiskSpaceInfo("/")
 
 	diskInfo := map[string]interface{}{
 		"totalSpace":               diskStats[0],
