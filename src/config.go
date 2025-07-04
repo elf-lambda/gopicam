@@ -11,6 +11,7 @@ type Config struct {
 	camera_url          string
 	ffmpeg_log_file     string
 	recording_clips_dir string
+	statisticsDir       string
 }
 
 func ReadConfig(config_path string) *Config {
@@ -24,7 +25,7 @@ func ReadConfig(config_path string) *Config {
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := scanner.Text()
-		tokens := strings.Split(line, ":")
+		tokens := strings.Split(line, "=")
 		key := tokens[0]
 		value := tokens[1]
 		switch key {
@@ -33,6 +34,8 @@ func ReadConfig(config_path string) *Config {
 		case "ffmpeg_log_file":
 			tmp = append(tmp, value)
 		case "recording_clips_dir":
+			tmp = append(tmp, value)
+		case "statistics_dir":
 			tmp = append(tmp, value)
 		}
 	}
@@ -44,5 +47,5 @@ func ReadConfig(config_path string) *Config {
 			recording_clips_dir: "./clips",
 		}
 	}
-	return &Config{tmp[0], tmp[1], tmp[2]}
+	return &Config{tmp[0], tmp[1], tmp[2], tmp[3]}
 }
