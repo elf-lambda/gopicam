@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -28,7 +29,7 @@ type ServerState struct {
 	ffmpegCmd          *exec.Cmd
 }
 
-var serverState = &ServerState{serverStartTime: int(time.Now().Unix())}
+var serverState = &ServerState{serverStartTime: int(time.Now().UnixMilli()), recordingStartTime: -1}
 
 // -------------------------------------------------------------------------------------
 
@@ -124,6 +125,19 @@ func stopFFMPEGRecording() {
 	fmt.Println("Recording not started. Doing nothing.")
 }
 
+func formatSize(bytes uint64) string {
+	const unit = 1024
+	if bytes < unit {
+		return fmt.Sprintf("%d B", bytes)
+	}
+	div, exp := uint64(unit), 0
+	for n := bytes / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
+}
+
 // -------------------------------------------------------------------------------------
 // -------------------------------------------------------------------------------------
 
@@ -184,5 +198,32 @@ func recordHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func statisticsHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
 
+	// TODO: change this on deployment
+	diskStats := getDiskSpaceInfo("D:/")
+
+	diskInfo := map[string]interface{}{
+		"totalSpace":               diskStats[0],
+		"totalSpaceFormatted":      formatSize(diskStats[0]),
+		"freeSpace":                diskStats[1],
+		"freeSpaceFormatted":       formatSize(diskStats[1]),
+		"usableSpace":              diskStats[2],
+		"usableSpaceFormatted":     formatSize(diskStats[2]),
+		"serverStartTimeMillis":    serverState.serverStartTime,
+		"recordingStartTimeMillis": serverState.recordingStartTime,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	err := json.NewEncoder(w).Encode(diskInfo)
+	if err != nil {
+		http.Error(w, "Error encoding JSON", http.StatusInternalServerError)
+		return
+	}
+
+	log.Println("Sent Statistics to client")
 }
