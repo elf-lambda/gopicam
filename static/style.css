@@ -1,0 +1,89 @@
+/* Reset & base styles */
+body {
+    margin: 0;
+    padding: 0;
+    font-family: "Segoe UI", Roboto, sans-serif;
+    background-color: #f4f6f9;
+    color: #333;
+}
+
+/* Layout */
+.page-layout {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    padding: 20px;
+    gap: 20px;
+}
+
+/* Card-style containers */
+.container,
+.statistics {
+    background-color: #fff;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    padding: 20px;
+    max-width: 700px;
+    flex: 1 1 300px;
+}
+
+/* Headings */
+h1,
+h2 {
+    color: #2c3e50;
+}
+
+/* Buttons */
+button {
+    padding: 10px 16px;
+    margin: 5px;
+    font-size: 14px;
+    border: none;
+    border-radius: 6px;
+    background-color: #007bff;
+    color: white;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+button:hover {
+    background-color: #0056b3;
+}
+
+/* Inputs */
+input[type="number"] {
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    margin-right: 8px;
+    width: 60px;
+}
+
+/* Links */
+a {
+    color: #007bff;
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+/* Specific sections */
+.stream-section img {
+    border-radius: 8px;
+    max-width: 100%;
+    margin-bottom: 10px;
+}
+
+.fullscreen-link,
+.videos-link {
+    display: inline-block;
+    margin-top: 10px;
+    font-weight: 500;
+}
+
+/* Cleanup */
+.cleanup-controls {
+    margin-top: 20px;
+}
