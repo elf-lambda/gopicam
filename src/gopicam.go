@@ -8,8 +8,11 @@ import (
 	"log"
 	"mime/multipart"
 	"net/http"
+	"net/url"
+	"os"
 	"os/exec"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -259,4 +262,62 @@ func deleteHandler(w http.ResponseWriter, r *http.Request) {
 	} else {
 		fmt.Fprintf(w, "%d Files Deleted", deletedFiles)
 	}
+}
+
+func videosHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	clipsDir := config.recording_clips_dir
+	files, err := os.ReadDir(clipsDir)
+	if err != nil {
+		http.Error(w, "Failed to read clips directory", http.StatusInternalServerError)
+		return
+	}
+
+	var html strings.Builder
+	html.WriteString(`<!DOCTYPE html><html lang="en"><head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<style>
+			body { font-family: sans-serif; margin: 2rem; background: #f9f9f9; color: #333; }
+			.container { max-width: 800px; margin: auto; }
+			h1 { text-align: center; }
+			ul { list-style: none; padding: 0; }
+			li { margin: 0.5rem 0; padding: 0.5rem; background: #fff; border-radius: 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+			a { text-decoration: none; color: #007BFF; }
+			a:hover { text-decoration: underline; }
+			.back { margin-top: 2rem; display: block; text-align: center; }
+		</style>
+		<title>Recorded Videos</title>
+	</head><body><div class="container">
+		<h1>Recorded Videos</h1>`)
+
+	var videoCount int
+	html.WriteString("<ul>")
+	for _, entry := range files {
+		if entry.Type().IsRegular() && strings.HasSuffix(strings.ToLower(entry.Name()), ".mkv") {
+			videoCount++
+			encoded := url.PathEscape(entry.Name())
+			html.WriteString(fmt.Sprintf(
+				`<li>%s (<a href="/clips/%s" download>Download</a>)</li>`,
+				entry.Name(), encoded))
+		}
+	}
+	html.WriteString("</ul>")
+
+	if videoCount == 0 {
+		html.WriteString("<p>No recorded videos found yet.</p>")
+	}
+
+	html.WriteString(`<a class="back" href="/">Back to Homepage</a>
+	</div></body></html>`)
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte(html.String()))
+
+	fmt.Println("Served /video request")
 }

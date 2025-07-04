@@ -18,6 +18,8 @@ func main() {
 	http.HandleFunc("/record", recordHandler)
 	http.HandleFunc("/statistics", statisticsHandler)
 	http.HandleFunc("/delete", deleteHandler)
+	http.HandleFunc("/videos", videosHandler)
+	http.Handle("/clips/", http.StripPrefix("/clips/", http.FileServer(http.Dir(config.recording_clips_dir))))
 
 	log.Println("Server starting on http://localhost:8001")
 	log.Fatal(http.ListenAndServe(":8001", nil))
