@@ -17,6 +17,7 @@ func main() {
 	http.HandleFunc("/stream", streamHandler)
 	http.HandleFunc("/record", recordHandler)
 	http.HandleFunc("/statistics", statisticsHandler)
+	http.HandleFunc("/delete", deleteHandler)
 
 	log.Println("Server starting on http://localhost:8001")
 	log.Fatal(http.ListenAndServe(":8001", nil))
