@@ -124,10 +124,44 @@ func getFFMPEGCommand(config *Config) []string {
 	return command
 }
 
+func scheduleFFmpegRollover() {
+	go func() {
+		for {
+			now := time.Now()
+
+			// Set target to today at 23:59:00
+			target := time.Date(
+				now.Year(), now.Month(), now.Day(),
+				23, 59, 0, 0, now.Location(),
+			)
+
+			// If it's already past 11:59 PM, schedule for tomorrow
+			if now.After(target) {
+				target = target.Add(24 * time.Hour)
+			}
+			fmt.Println("FFMPEG Scheduler sleeping until ", target)
+			time.Sleep(time.Until(target))
+
+			fmt.Println("It's 11:59 PM — rotating FFmpeg")
+
+			stopFFMPEGRecording()
+			startFFMPEGRecording()
+		}
+	}()
+}
+
 func startFFMPEGRecording() error {
 	if !serverState.recordingState {
+		today := time.Now().Format("20060102") // e.g., "20250705"
+		outputDir := filepath.Join(config.recording_clips_dir, today)
+
+		err := os.MkdirAll(outputDir, 0755)
+		if err != nil {
+			log.Fatalf("Failed to create output directory: %v", err)
+		}
+
 		serverState.ffmpegCmd = exec.Command(getFFMPEGCommand(config)[0], getFFMPEGCommand(config)[1:]...)
-		err := serverState.ffmpegCmd.Start()
+		err = serverState.ffmpegCmd.Start()
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -302,7 +336,7 @@ func deleteHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Error parsing days", http.StatusBadRequest)
 		return
 	}
-	deletedFiles := deleteFilesOlderThan(config.recording_clips_dir, int(days))
+	deletedFiles := deleteFoldersOlderThan(config.recording_clips_dir, int(days))
 
 	w.Header().Set("Content-Type", "text")
 

@@ -17,7 +17,8 @@ func main() {
 	// }()
 
 	// Port 8080 for live
-	go connectToSource("http://localhost:8002")
+	go connectToSource("http://localhost:8080")
+	go scheduleFFmpegRollover()
 	fmt.Println("Loaded config: ", config)
 
 	fs := http.FileServer(http.Dir("static"))
