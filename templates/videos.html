@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/videos_style.css">
+    <title>Recorded Videos</title>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Recorded Videos</h1>
+        <ul>
+            {{if .ParentLink}}
+            <li><a href="/videos?path={{.ParentLinkEscaped}}">⬅️ Up to {{.ParentLink}}</a></li>
+            {{end}}
+            {{range .Dirs}}
+            <li>📁 <a href="/videos?path={{.LinkEscaped}}">{{.Name}}</a></li>
+            {{end}}
+            {{range .Files}}
+            <li>🎥 {{.Name}} (<a href="/clips/{{.LinkEscaped}}" download>Download</a>)</li>
+            {{end}}
+        </ul>
+        <a class="back" href="/">Back to Homepage</a>
+    </div>
+</body>
+
+</html>
