@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html/template"
 	"io"
 	"log"
 	"mime/multipart"
@@ -12,6 +13,8 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -43,6 +46,21 @@ var serverState = &ServerState{
 
 // -------------------------------------------------------------------------------------
 
+var tmpl = template.Must(template.ParseFiles("templates/videos.html"))
+
+type fileEntry struct {
+	Name        string
+	LinkEscaped string
+}
+
+type templateData struct {
+	ParentLink        string
+	ParentLinkEscaped string
+	Dirs              []fileEntry
+	Files             []fileEntry
+}
+
+// -------------------------------------------------------------------------------------
 func readFrames(reader io.Reader) {
 	mr := multipart.NewReader(reader, "frame")
 
@@ -99,7 +117,8 @@ func getFFMPEGCommand(config *Config) []string {
 		"-segment_format", "mkv",
 		"-segment_atclocktime", "1",
 		"-strftime", "1",
-		config.recording_clips_dir + "/%Y%m%dT%H%M%S.mkv",
+		config.recording_clips_dir + "/%Y%m%d/%Y%m%dT%H%M%S.mkv",
+		// config.recording_clips_dir + "/%Y%m%dT%H%M%S.mkv",
 	}
 
 	return command
@@ -300,55 +319,47 @@ func videosHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	clipsDir := config.recording_clips_dir
-	files, err := os.ReadDir(clipsDir)
+	subPath := r.URL.Query().Get("path")
+	fullPath := filepath.Join(config.recording_clips_dir, filepath.Clean(subPath))
+
+	files, err := os.ReadDir(fullPath)
 	if err != nil {
-		http.Error(w, "Failed to read clips directory", http.StatusInternalServerError)
+		http.Error(w, "Failed to read directory", http.StatusInternalServerError)
 		return
 	}
 
-	var html strings.Builder
-	html.WriteString(`<!DOCTYPE html><html lang="en"><head>
-		<meta charset="UTF-8">
-		<meta name="viewport" content="width=device-width, initial-scale=1.0">
-		<style>
-			body { font-family: sans-serif; margin: 2rem; background: #f9f9f9; color: #333; }
-			.container { max-width: 800px; margin: auto; }
-			h1 { text-align: center; }
-			ul { list-style: none; padding: 0; }
-			li { margin: 0.5rem 0; padding: 0.5rem; background: #fff; border-radius: 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-			a { text-decoration: none; color: #007BFF; }
-			a:hover { text-decoration: underline; }
-			.back { margin-top: 2rem; display: block; text-align: center; }
-		</style>
-		<title>Recorded Videos</title>
-	</head><body><div class="container">
-		<h1>Recorded Videos</h1>`)
+	var data templateData
 
-	var videoCount int
-	html.WriteString("<ul>")
+	// add "Up" link
+	if subPath != "" && subPath != "." {
+		parent := filepath.Dir(subPath)
+		data.ParentLink = parent
+		data.ParentLinkEscaped = url.QueryEscape(parent)
+	}
+
+	// populate
 	for _, entry := range files {
-		if entry.Type().IsRegular() && (strings.HasSuffix(strings.ToLower(entry.Name()), ".mkv") ||
-			strings.HasSuffix(strings.ToLower(entry.Name()), ".avi")) {
-			videoCount++
-			encoded := url.PathEscape(entry.Name())
-			html.WriteString(fmt.Sprintf(
-				`<li>%s (<a href="/clips/%s" download>Download</a>)</li>`,
-				entry.Name(), encoded))
+		if entry.IsDir() {
+			dirName := entry.Name()
+			linkPath := path.Join(subPath, dirName)
+			data.Dirs = append(data.Dirs, fileEntry{
+				Name:        dirName,
+				LinkEscaped: url.QueryEscape(linkPath),
+			})
+		} else if entry.Type().IsRegular() && (strings.HasSuffix(strings.ToLower(entry.Name()), ".mkv") || strings.HasSuffix(strings.ToLower(entry.Name()), ".avi")) {
+			fileName := entry.Name()
+			linkPath := path.Join(subPath, fileName)
+			data.Files = append(data.Files, fileEntry{
+				Name:        fileName,
+				LinkEscaped: url.PathEscape(linkPath),
+			})
 		}
 	}
-	html.WriteString("</ul>")
-
-	if videoCount == 0 {
-		html.WriteString("<p>No recorded videos found yet.</p>")
-	}
-
-	html.WriteString(`<a class="back" href="/">Back to Homepage</a>
-	</div></body></html>`)
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write([]byte(html.String()))
-
-	fmt.Println("Served /video request")
+	err = tmpl.Execute(w, data)
+	if err != nil {
+		http.Error(w, "Template execution error", http.StatusInternalServerError)
+	}
 }
