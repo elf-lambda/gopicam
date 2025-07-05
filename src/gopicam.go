@@ -123,29 +123,32 @@ func getFFMPEGCommand(config *Config) []string {
 
 	return command
 }
-
 func scheduleFFmpegRollover() {
 	go func() {
 		for {
 			now := time.Now()
 
-			// Set target to today at 23:59:00
-			target := time.Date(
-				now.Year(), now.Month(), now.Day(),
-				23, 59, 0, 0, now.Location(),
-			)
+			// target time: today at 23:59
+			target := time.Date(now.Year(), now.Month(), now.Day(), 23, 59, 0, 0, now.Location())
 
-			// If it's already past 11:59 PM, schedule for tomorrow
+			// if already past 23:59 today, schedule for tomorrow
 			if now.After(target) {
 				target = target.Add(24 * time.Hour)
 			}
-			fmt.Println("FFMPEG Scheduler sleeping until ", target)
+
+			fmt.Println("FFMPEG Scheduler sleeping until", target)
 			time.Sleep(time.Until(target))
 
-			fmt.Println("It's 11:59 PM — rotating FFmpeg")
+			// create directory for next day
+			nextDay := target.Add(1 * time.Minute).Format("20060102")
+			nextDayPath := filepath.Join(config.recording_clips_dir, nextDay)
 
-			stopFFMPEGRecording()
-			startFFMPEGRecording()
+			err := os.MkdirAll(nextDayPath, 0755)
+			if err != nil {
+				fmt.Printf("Failed to create directory for next day (%s): %v\n", nextDayPath, err)
+			} else {
+				fmt.Printf("Prepared directory for next day: %s\n", nextDayPath)
+			}
 		}
 	}()
 }
