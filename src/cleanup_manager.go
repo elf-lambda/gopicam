@@ -2,13 +2,12 @@ package main
 
 import (
 	"fmt"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"time"
 )
 
-func deleteFilesOlderThan(dirPath string, days int) int {
+func deleteFoldersOlderThan(dirPath string, days int) int {
 	if days < 0 {
 		fmt.Println("CleanupManager: 'days' parameter cannot be negative.")
 		return 0
@@ -24,36 +23,37 @@ func deleteFilesOlderThan(dirPath string, days int) int {
 
 	deletedCount := 0
 
-	err = filepath.WalkDir(dirPath, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			fmt.Printf("CleanupManager: Failed to access %s: %v\n", path, err)
-			return nil
-		}
-		if d.IsDir() {
-			return nil
-		}
-
-		fileInfo, err := d.Info()
-		if err != nil {
-			fmt.Printf("CleanupManager: Failed to get info for %s: %v\n", path, err)
-			return nil
-		}
-
-		if fileInfo.ModTime().Before(cutoff) {
-			fmt.Printf("CleanupManager: Deleting old file: %s\n", path)
-			if err := os.Remove(path); err == nil {
-				deletedCount++
-			} else {
-				fmt.Printf("CleanupManager: Failed to delete file: %s: %v\n", path, err)
-			}
-		}
-		return nil
-	})
-
+	entries, err := os.ReadDir(dirPath)
 	if err != nil {
-		fmt.Printf("CleanupManager: Error walking directory: %v\n", err)
+		fmt.Printf("CleanupManager: Failed to read directory: %v\n", err)
+		return 0
 	}
 
-	fmt.Printf("CleanupManager: Deletion finished. Successfully deleted %d files older than %d days.\n", deletedCount, days)
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+
+		folderName := entry.Name()
+
+		// Parse folder name as date: YYYYMMDD
+		folderDate, err := time.Parse("20060102", folderName)
+		if err != nil {
+			// Not a date folder, skip
+			continue
+		}
+
+		if folderDate.Before(cutoff) {
+			folderPath := filepath.Join(dirPath, folderName)
+			fmt.Printf("CleanupManager: Deleting old folder: %s\n", folderPath)
+			if err := os.RemoveAll(folderPath); err == nil {
+				deletedCount++
+			} else {
+				fmt.Printf("CleanupManager: Failed to delete folder: %s: %v\n", folderPath, err)
+			}
+		}
+	}
+
+	fmt.Printf("CleanupManager: Deletion finished. Successfully deleted %d folders older than %d days.\n", deletedCount, days)
 	return deletedCount
 }
