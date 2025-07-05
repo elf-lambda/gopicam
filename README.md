@@ -1,5 +1,7 @@
 # gopicam - Relay & Recorder
 
+![Image Screenshot](screenshots/ss1.png)
+
 A lightweight webcam relay and recording system built in Go, designed primarily for Raspberry Pi environments. This project captures and streams a webcam feed efficiently, with multi-client support and segment-based video recording.
 
 ---
