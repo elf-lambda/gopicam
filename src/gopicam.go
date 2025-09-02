@@ -126,6 +126,22 @@ func getFFMPEGCommand(config *Config) []string {
 func scheduleFFmpegRollover() {
 	go func() {
 		for {
+			// Autocleanup
+
+			space := getDiskSpaceInfo(config.statisticsDir)
+			bytesTotal := space[0]
+			bytesFree := space[1]
+			const threshold = 20.0
+
+			freePercent := (float64(bytesFree) / float64(bytesTotal)) * 100
+
+			fmt.Printf("\tbytesTotal: %d\n\tbutesFree: %d\n\tfreePercent: %.2f\n", bytesTotal, bytesFree, freePercent)
+
+			if freePercent <= threshold {
+				fmt.Printf("Automatic cleanup at %.1f%%\n", freePercent)
+				deleteFoldersOlderThan(config.recording_clips_dir, 3)
+			}
+
 			now := time.Now()
 
 			// target time: today at 23:59
